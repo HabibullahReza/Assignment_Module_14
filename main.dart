@@ -1,214 +1,138 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 void main() {
   runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
+  static String appBarTitle = 'Photo Gallery App';
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Shopping App',
+      title: 'Photo Gallery App',
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: ShoppingCartScreen(),
+      home: PhotoList(),
     );
   }
 }
 
-class ShoppingCartItem {
-  final String name;
-  final double price;
-  final String color;
-  final String size;
-  int quantity;
-  final String imageUrl; // Add image URL for each item
-
-  ShoppingCartItem({
-    required this.name,
-    required this.price,
-    required this.color,
-    required this.size,
-    required this.quantity,
-    required this.imageUrl,
-  });
-}
-
-class ShoppingCartScreen extends StatefulWidget {
+class PhotoList extends StatefulWidget {
   @override
-  _ShoppingCartScreenState createState() => _ShoppingCartScreenState();
+  _PhotoListState createState() => _PhotoListState();
 }
 
-class _ShoppingCartScreenState extends State<ShoppingCartScreen> {
-  List<ShoppingCartItem> shoppingCartItems = [
-    ShoppingCartItem(
-      name: 'Pullover',
-      price: 25.0,
-      color: 'Black',
-      size: 'L',
-      quantity: 1,
-      imageUrl: 'https://cdn.fashionbizapps.nz/honeybee/products/management/data/talent/WP916M_Talent_FrenchBlue_00.jpg',
-    ),
-    ShoppingCartItem(
-      name: 'T-Shirt',
-      price: 15.0,
-      color: 'Gray',
-      size: 'L',
-      quantity: 1,
-      imageUrl: 'https://static-01.daraz.com.bd/p/51cacc41c2b27adc447d9ad558561e5b.jpg',
-    ),
-    ShoppingCartItem(
-      name: 'Sport Dress',
-      price: 40.0,
-      color: 'Black',
-      size: 'M',
-      quantity: 1,
-      imageUrl: 'https://chkokko.com/cdn/shop/files/1_f6fe5613-ed64-4b83-be46-879ddbe875e4.jpg?v=1696081444',
-    ),
-  ];
+class _PhotoListState extends State<PhotoList> {
+  List<dynamic> _photos = [];
+  bool _isLoading = true;
+  String _error = '';
 
-  void _addItem(int index) {
-    setState(() {
-      final item = shoppingCartItems[index];
-      item.quantity = (item.quantity ?? 0) + 1;
+  @override
+  void initState() {
+    super.initState();
+    fetchPhotos();
+  }
 
-      if (item.quantity == 5) {
-        _showItemAddedDialog(item.name);
+  Future<void> fetchPhotos() async {
+    try {
+      final response = await http.get(Uri.parse('https://jsonplaceholder.typicode.com/photos'));
+      if (response.statusCode == 200) {
+        setState(() {
+          _photos = json.decode(response.body);
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _isLoading = false;
+          _error = 'Failed to load photos';
+        });
       }
-    });
-  }
-
-  void _removeItem(int index) {
-    setState(() {
-      final item = shoppingCartItems[index];
-      if (item.quantity! > 1) {
-        item.quantity = item.quantity! - 1;
-      }
-    });
-  }
-
-  void _showItemAddedDialog(String itemName) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Congratulations!'),
-          content: Text('You have added 5 $itemName on your bag!'),
-          actions: <Widget>[
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              style: ElevatedButton.styleFrom(
-                primary: Colors.red, // Set the background color to red
-                onPrimary: Colors.white, // Set the text color to white
-              ),
-              child: Text('OKAY'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showCongratulationsSnackbar() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Congratulations! Check out successful.'),
-        duration: Duration(seconds: 3),
-      ),
-    );
-  }
-
-  double _calculateTotalAmount() {
-    double totalAmount = 0.0;
-    for (var item in shoppingCartItems) {
-      totalAmount += item.quantity! * item.price;
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _error = 'Failed to connect to the server';
+      });
     }
-    return totalAmount;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('My Bag'),
+        title: Text(MyApp.appBarTitle),
+        backgroundColor: Colors.green,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: GridView.builder(
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: MediaQuery.of(context).size.width ~/ 200, // Adjust the number of items per row based on screen width
-                  crossAxisSpacing: 8.0,
-                  mainAxisSpacing: 8.0,
-                  childAspectRatio: 0.7,
-                ),
-                itemCount: shoppingCartItems.length,
-                itemBuilder: (context, index) {
-                  final item = shoppingCartItems[index];
-
-                  return Card(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Image.network(item.imageUrl, fit: BoxFit.cover),
-                        ),
-                        ListTile(
-                          title: Text(item.name),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Color: ${item.color}'),
-                              Text('Size: ${item.size}'),
-                              Text('\$${item.price.toString()}'),
-                            ],
+      body: _isLoading
+          ? Center(child: CircularProgressIndicator())
+          : _error.isNotEmpty
+              ? Center(child: Text(_error))
+              : ListView.builder(
+                  itemCount: _photos.length,
+                  itemBuilder: (context, index) {
+                    final photo = _photos[index];
+                    return ListTile(
+                      leading: Image.network(
+                        photo['thumbnailUrl'],
+                        width: 50,
+                        height: 50,
+                      ),
+                      title: Text(photo['title']),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => PhotoDetail(photo: photo),
                           ),
-                        ),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            IconButton(
-                              icon: Icon(Icons.remove),
-                              onPressed: () => _removeItem(index),
-                            ),
-                            Text(
-                              item.quantity.toString(),
-                              style: TextStyle(fontSize: 18),
-                            ),
-                            IconButton(
-                              icon: Icon(Icons.add),
-                              onPressed: () => _addItem(index),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
+                        ).then((_) {
+                          MyApp.appBarTitle = 'Photo Gallery App';
+                        });
+                        MyApp.appBarTitle = 'Photo Details';
+                      },
+                    );
+                  },
+                ),
+    );
+  }
+}
+
+class PhotoDetail extends StatelessWidget {
+  final Map<String, dynamic> photo;
+
+  const PhotoDetail({Key? key, required this.photo}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Photo Details'),
+        backgroundColor: Colors.green,
+      ),
+      body: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Image.network(
+              photo['url'],
+              width: MediaQuery.of(context).size.width,
+              height: MediaQuery.of(context).size.height * 0.8, // Adjust the height as needed
+              fit: BoxFit.cover,
             ),
-            SizedBox(height: 20),
-            Text(
-              'Total Amount: \$${_calculateTotalAmount()}',
-              style: TextStyle(fontSize: 18),
-            ),
-            SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _showCongratulationsSnackbar,
-              style: ElevatedButton.styleFrom(
-                primary: Colors.red, // Set the background color to red
-                onPrimary: Colors.white, // Set the text color to white
-              ),
-              child: Text('CHECK OUT'),
-            ),
-          ],
-        ),
+          ),
+          SizedBox(height: 20),
+          Text(
+            'Title: ${photo['title']}',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          SizedBox(height: 10),
+          Text(
+            'ID: ${photo['id']}',
+            style: TextStyle(fontSize: 16),
+          ),
+        ],
       ),
     );
   }
